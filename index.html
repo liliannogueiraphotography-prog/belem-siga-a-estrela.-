@@ -97,6 +97,45 @@ displayCoupon(data);
 }catch(e){status.textContent='Conexão interrompida. Use “Recuperar meu prêmio” para consultar o resultado registrado.';}
 finally{wheel?.classList.remove('roleta-waiting');busy=false;}
 }
+const TEST_MODE=new URLSearchParams(location.search).get('teste')==='1';
+if(TEST_MODE){
+  const testBtn=document.createElement('button');
+  testBtn.type='button';
+  testBtn.textContent='✦ TESTAR GIRO E CUPOM ✦';
+  testBtn.style.cssText='display:block;width:100%;padding:16px;margin-top:12px;border-radius:999px;border:2px solid #ffe9ad;background:linear-gradient(110deg,#9d631b,#fff3c4,#d99b2f,#ffe8a0);color:#3a1707;font-weight:900;box-shadow:0 0 22px #ffd36d;cursor:pointer';
+  form.append(testBtn);
+  const notice=document.createElement('p');
+  notice.className='note';
+  notice.textContent='MODO TESTE: códigos demonstrativos não são válidos no checkout. Nenhum prêmio real é emitido.';
+  form.append(notice);
+  let testRunning=false;
+  testBtn.onclick=async()=>{
+    if(testRunning)return;
+    testRunning=true;testBtn.disabled=true;
+    parchment.classList.add('hidden');
+    const prizes=['50','20','5','none','10','ensaio'];
+    const available=['50','20','5','10','ensaio'];
+    const chosen=available[Math.floor(Math.random()*available.length)];
+    const wheel=document.querySelector('.wheel');
+    wheel.classList.add('roleta-waiting');
+    wheel.scrollIntoView({behavior:'smooth',block:'center'});
+    await new Promise(resolve=>setTimeout(resolve,1200));
+    wheel.classList.remove('roleta-waiting');
+    wheel.style.transition='none';wheel.style.transform='rotate(0deg)';void wheel.offsetWidth;
+    wheel.style.transition='transform 6s cubic-bezier(.08,.7,.08,1)';
+    const index=prizes.indexOf(chosen);
+    wheel.style.transform='rotate('+(1800+(330-index*60))+'deg)';
+    await new Promise(resolve=>setTimeout(resolve,6000));
+    const demoCode='TESTE-'+chosen.toUpperCase()+'-'+Math.random().toString(36).slice(2,8).toUpperCase();
+    displayCoupon({ok:true,coupon:{code:demoCode,prize_id:chosen,label:'Prêmio de demonstração',expires_at:null}});
+    const demo=parchment.querySelector('.scroll-demo');
+    demo.textContent='⚠️ TESTE: cupom fictício. Não gera desconto nem reserva.';
+    demo.style.cssText='display:block!important;color:#8b2118;font-weight:900;font-size:15px';
+    const redeem=parchment.querySelector('#redeemPrize');
+    if(redeem){redeem.removeAttribute('href');redeem.setAttribute('aria-disabled','true');redeem.textContent='✦ RESGATAR MEU PRÊMIO (TESTE) ✦';redeem.onclick=e=>{e.preventDefault();alert('Este é um cupom de teste, sem validade. O resgate real será liberado após homologação.');};}
+    awarded=false;testRunning=false;testBtn.disabled=false;
+  };
+}
 form.onsubmit=e=>{e.preventDefault();updateReady();if(ready){cpfInput.blur();status.textContent='Agora toque na estrela para descobrir seu prêmio. ✨';wheelStar.scrollIntoView({behavior:'smooth',block:'center'});}};
 wheelStar.onclick=()=>{if(!busy&&!awarded){document.activeElement?.blur?.();requestPrize('girar');}};
 wheelStar.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();if(!busy&&!awarded)requestPrize('girar');}};
