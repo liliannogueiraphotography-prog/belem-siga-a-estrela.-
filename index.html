@@ -44,12 +44,15 @@ if(!c||!c.code||!c.prize_id){status.textContent='O servidor não confirmou um cu
 const prize=String(c.prize_id);
 const labels={ensaio:'Ensaio Belém: crédito do Pacote 1 no lote da reserva', '50':'50% de desconto', '20':'20% de desconto', '10':'10% de desconto', '5':'5% de desconto'};
 const label=labels[prize]||c.label||'Prêmio Belém';
+const creditInfo=prize==='ensaio'
+  ? 'VOCÊ GANHOU UM ENSAIO BELÉM! Seu prêmio cobre o valor integral do Pacote 1 (10 fotos digitais). Se preferir qualquer outro pacote, você recebe um crédito equivalente ao valor do Pacote 1 do lote vigente na data da reserva: Lote 1: R$ 680,00; Lote 2: R$ 880,00; Lote 3: R$ 1.000,00. Esse valor é abatido do pacote escolhido e você paga somente a diferença, além de eventuais extras. O crédito não é cumulativo com outros descontos.'
+  : label;
 parchment.querySelector('h3').textContent='Seu presente de Belém!';
-parchment.querySelector('.scroll-prize').textContent=label;
+parchment.querySelector('.scroll-prize').textContent=creditInfo;
 parchment.querySelector('.coupon-display').style.display='flex';
 parchment.querySelector('.coupon-display strong').textContent=c.code;
 parchment.querySelector('.coupon-display span').textContent=c.expires_at?'Válido até '+new Date(c.expires_at).toLocaleString('pt-BR'):'Use este código na reserva. Não cumulativo.';
-parchment.querySelector('.scroll-instructions').textContent='Copie seu código e aplique na reserva do Belém Experience. Descontos não cumulativos.';
+parchment.querySelector('.scroll-instructions').textContent=prize==='ensaio'?'Copie seu código e escolha o pacote desejado no Belém Experience. O valor do Pacote 1 do lote da reserva será abatido automaticamente.':'Copie seu código e aplique na reserva do Belém Experience. Descontos não cumulativos.';
 parchment.querySelector('.scroll-demo').textContent='';
 const redeem=parchment.querySelector('#redeemPrize');if(redeem){redeem.textContent='✦ RESGATAR MEU PRÊMIO ✦';redeem.classList.add('gold-invite');redeem.style.cssText='display:inline-block;margin-top:20px;padding:18px 24px;border-radius:999px;background:linear-gradient(110deg,#a56a1c,#fff2b5,#d59c2b,#fff0a7,#9c601b);background-size:240% 100%;color:#3b1b0b;font-weight:900;text-decoration:none;box-shadow:0 0 28px #ffd36d,0 0 60px #e8a83b88;animation:goldPulse 1.8s ease-in-out infinite,goldSweep 3s linear infinite';}
 let copy=parchment.querySelector('.roleta-copy');
