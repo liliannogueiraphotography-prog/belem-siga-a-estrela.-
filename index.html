@@ -117,8 +117,7 @@ if(TEST_MODE){
     testRunning=true;testBtn.disabled=true;
     parchment.classList.add('hidden');
     const prizes=['50','20','5','5','10','ensaio'];
-    const available=['50','20','5','10','ensaio'];
-    const chosen=available[Math.floor(Math.random()*available.length)];
+    const chosen='5';
     const wheel=document.querySelector('.wheel');
     wheel.classList.add('roleta-waiting');
     wheel.scrollIntoView({behavior:'smooth',block:'center'});
