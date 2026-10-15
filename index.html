@@ -20,18 +20,26 @@ style.textContent='.roleta-form{max-width:360px;margin:18px auto;padding:18px;bo
 document.head.appendChild(style);
 const form=document.createElement('form');
 form.className='roleta-form';
-form.innerHTML='<label>Seu CPF para participar<input id="roletaCpf" type="text" inputmode="numeric" autocomplete="off" maxlength="14" placeholder="000.000.000-00" required></label><label class="consent"><input id="roletaConsent" type="checkbox" required>Li e aceito o uso do meu CPF exclusivamente para controlar uma participação por pessoa, registrar e recuperar meu prêmio. O CPF é transformado em código criptográfico no servidor.</label><button id="roletaSubmit" type="submit">✦ GIRAR A ROLETA</button><button id="roletaRecover" type="button" style="margin-top:9px;background:transparent;color:#f7dfb3;border:1px solid #c89b63">Recuperar meu prêmio</button><p id="roletaStatus" class="roleta-status" role="status" aria-live="polite"></p>';
+form.innerHTML='<label>Seu CPF para participar<input id="roletaCpf" type="text" inputmode="numeric" autocomplete="off" maxlength="14" placeholder="000.000.000-00" required></label><label class="consent"><input id="roletaConsent" type="checkbox" required>Li e aceito o uso do meu CPF exclusivamente para controlar uma participação por pessoa, registrar e recuperar meu prêmio. O CPF é transformado em código criptográfico no servidor.</label><p id="roletaStatus" class="roleta-status" role="status" aria-live="polite"></p>';
 spinSection.insertBefore(form,parchment);
 const status=form.querySelector('#roletaStatus');
-const submit=form.querySelector('#roletaSubmit');
-const recover=form.querySelector('#roletaRecover');
-let busy=false;
+const cpfInput=form.querySelector('#roletaCpf');
+const consent=form.querySelector('#roletaConsent');
+let busy=false;let ready=false;let awarded=false;
+const instruction=spinSection.querySelector('.wheel-instruction');
+
+if(instruction)instruction.innerHTML='☝️ TOQUE NA ESTRELA PARA GIRAR A ROLETA ✦';
+const helper=document.createElement('p');helper.className='note';helper.textContent='Informe seu CPF e pressione Enter. Depois, toque na estrela para girar.';form.prepend(helper);
+const recoverHint=document.createElement('p');recoverHint.className='note';recoverHint.textContent='Se já participou, digite o mesmo CPF e toque na estrela para recuperar o prêmio.';form.append(recoverHint);
+form.style.maxWidth='340px';
+const updateReady=()=>{ready=cpfInput.value.replace(/\D/g,'').length===11&&consent.checked;if(ready){status.textContent='Pronto! Toque na estrela acima. ✨';wheelStar.setAttribute('aria-label','Toque na estrela para girar a roleta');}};
+cpfInput.addEventListener('input',updateReady);consent.addEventListener('change',updateReady);
 function displayCoupon(result){
 const c=result?.coupon||result?.award?.coupon||null;
 if(!c||!c.code||!c.prize_id){status.textContent='O servidor não confirmou um cupom. Nenhum resultado será anunciado.';return false;}
 const prize=String(c.prize_id);
 const labels={ensaio:'Ensaio Belém: crédito do Pacote 1 no lote da reserva', '50':'50% de desconto', '20':'20% de desconto', '10':'10% de desconto', '5':'5% de desconto'};
-const label=c.label||labels[prize]||'Prêmio Belém';
+const label=labels[prize]||c.label||'Prêmio Belém';
 parchment.querySelector('h3').textContent='Seu presente de Belém!';
 parchment.querySelector('.scroll-prize').textContent=label;
 parchment.querySelector('.coupon-display').style.display='flex';
@@ -39,6 +47,7 @@ parchment.querySelector('.coupon-display strong').textContent=c.code;
 parchment.querySelector('.coupon-display span').textContent=c.expires_at?'Válido até '+new Date(c.expires_at).toLocaleString('pt-BR'):'Use este código na reserva. Não cumulativo.';
 parchment.querySelector('.scroll-instructions').textContent='Copie seu código e aplique na reserva do Belém Experience. Descontos não cumulativos.';
 parchment.querySelector('.scroll-demo').textContent='';
+const redeem=parchment.querySelector('#redeemPrize');if(redeem){redeem.textContent='✦ RESGATAR MEU PRÊMIO ✦';redeem.classList.add('gold-invite');redeem.style.cssText='display:inline-block;margin-top:20px;padding:18px 24px;border-radius:999px;background:linear-gradient(110deg,#a56a1c,#fff2b5,#d59c2b,#fff0a7,#9c601b);background-size:240% 100%;color:#3b1b0b;font-weight:900;text-decoration:none;box-shadow:0 0 28px #ffd36d,0 0 60px #e8a83b88;animation:goldPulse 1.8s ease-in-out infinite,goldSweep 3s linear infinite';}
 let copy=parchment.querySelector('.roleta-copy');
 if(!copy){copy=document.createElement('button');copy.type='button';copy.className='roleta-copy';parchment.querySelector('.coupon-display').after(copy);}
 copy.textContent='Copiar cupom';copy.onclick=()=>navigator.clipboard.writeText(c.code).then(()=>{copy.textContent='Código copiado!'}).catch(()=>{copy.textContent='Selecione e copie o código acima'});
@@ -46,14 +55,15 @@ parchment.classList.remove('hidden');
 wheelStar.setAttribute('aria-disabled','true');
 wheelStar.setAttribute('aria-label','Prêmio já registrado');
 wheelStar.style.cursor='default';
-submit.disabled=true;
+awarded=true;
 status.textContent='Prêmio confirmado e registrado!';
+parchment.scrollIntoView({behavior:'smooth',block:'start'});
 return true;
 }
 async function requestPrize(action){
 if(busy)return;
-if(!form.reportValidity())return;
-busy=true;submit.disabled=true;recover.disabled=true;
+if(!ready||!form.reportValidity()){status.textContent='Preencha o CPF e aceite a participação antes de tocar na estrela.';form.scrollIntoView({behavior:'smooth',block:'center'});return;}
+busy=true;
 status.textContent=action==='girar'?'Registrando seu prêmio com segurança...':'Consultando seu prêmio...';
 try{
 const res=await fetch(API,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({cpf:form.querySelector('#roletaCpf').value,aceite:true,versao_aceite:CONSENT,acao:action}),cache:'no-store'});
@@ -77,12 +87,11 @@ await new Promise(resolve=>setTimeout(resolve,6000));
 }
 displayCoupon(data);
 }catch(e){status.textContent='Conexão interrompida. Use “Recuperar meu prêmio” para consultar o resultado registrado.';}
-finally{busy=false;recover.disabled=false;if(!parchment.classList.contains('hidden'))return;submit.disabled=false;}
+finally{busy=false;}
 }
-form.onsubmit=e=>{e.preventDefault();requestPrize('girar');};
-recover.onclick=()=>requestPrize('consultar');
-wheelStar.onclick=()=>{if(!busy)form.scrollIntoView({behavior:'smooth',block:'center'});};
-wheelStar.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();form.scrollIntoView({behavior:'smooth',block:'center'});}};
+form.onsubmit=e=>{e.preventDefault();updateReady();if(ready){cpfInput.blur();status.textContent='Agora toque na estrela para descobrir seu prêmio. ✨';wheelStar.scrollIntoView({behavior:'smooth',block:'center'});}};
+wheelStar.onclick=()=>{if(!busy&&!awarded)requestPrize('girar');};
+wheelStar.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();if(!busy&&!awarded)requestPrize('girar');}};
 parchment.classList.add('hidden');
 wheelStar.setAttribute('aria-label','Preencha seu CPF para participar da roleta');
 })();
