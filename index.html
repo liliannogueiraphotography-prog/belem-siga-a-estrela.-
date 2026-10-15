@@ -29,10 +29,10 @@ let busy=false;let ready=false;let awarded=false;
 const instruction=spinSection.querySelector('.wheel-instruction');
 
 if(instruction)instruction.innerHTML='☝️ TOQUE NA ESTRELA PARA GIRAR A ROLETA ✦';
-const helper=document.createElement('p');helper.className='note';helper.textContent='Informe seu CPF e pressione Enter. Depois, toque na estrela para girar.';form.prepend(helper);
-const recoverHint=document.createElement('p');recoverHint.className='note';recoverHint.textContent='Se já participou, digite o mesmo CPF e toque na estrela para recuperar o prêmio.';form.append(recoverHint);
+const helper=document.createElement('p');helper.className='note';helper.textContent='Informe seu CPF, aceite a participação e toque diretamente na estrela para girar.';form.prepend(helper);
+const recoverHint=document.createElement('p');recoverHint.className='note';recoverHint.textContent='Se já participou, informe o mesmo CPF e toque na estrela para recuperar seu prêmio.';form.append(recoverHint);
 form.style.maxWidth='340px';
-const updateReady=()=>{ready=cpfInput.value.replace(/\D/g,'').length===11&&consent.checked;if(ready){status.textContent='Pronto! Toque na estrela acima. ✨';wheelStar.setAttribute('aria-label','Toque na estrela para girar a roleta');}};
+const updateReady=()=>{ready=cpfInput.value.replace(/\D/g,'').length===11&&consent.checked;if(ready){status.textContent='Pronto! Toque na estrela acima. ✨';wheelStar.setAttribute('aria-label','Toque na estrela para girar a roleta');}else{status.textContent='';}};
 cpfInput.addEventListener('input',updateReady);consent.addEventListener('change',updateReady);
 function displayCoupon(result){
 const c=result?.coupon||result?.award?.coupon||null;
@@ -62,7 +62,7 @@ return true;
 }
 async function requestPrize(action){
 if(busy)return;
-if(!ready||!form.reportValidity()){status.textContent='Preencha o CPF e aceite a participação antes de tocar na estrela.';form.scrollIntoView({behavior:'smooth',block:'center'});return;}
+updateReady();if(!ready||!form.reportValidity()){status.textContent='Preencha o CPF e aceite a participação antes de tocar na estrela.';form.scrollIntoView({behavior:'smooth',block:'center'});return;}
 busy=true;
 status.textContent=action==='girar'?'Registrando seu prêmio com segurança...':'Consultando seu prêmio...';
 try{
@@ -90,7 +90,7 @@ displayCoupon(data);
 finally{busy=false;}
 }
 form.onsubmit=e=>{e.preventDefault();updateReady();if(ready){cpfInput.blur();status.textContent='Agora toque na estrela para descobrir seu prêmio. ✨';wheelStar.scrollIntoView({behavior:'smooth',block:'center'});}};
-wheelStar.onclick=()=>{if(!busy&&!awarded)requestPrize('girar');};
+wheelStar.onclick=()=>{if(!busy&&!awarded){document.activeElement?.blur?.();requestPrize('girar');}};
 wheelStar.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();if(!busy&&!awarded)requestPrize('girar');}};
 parchment.classList.add('hidden');
 wheelStar.setAttribute('aria-label','Preencha seu CPF para participar da roleta');
