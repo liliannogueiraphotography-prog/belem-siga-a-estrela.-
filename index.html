@@ -29,11 +29,15 @@ let busy=false;let ready=false;let awarded=false;
 const instruction=spinSection.querySelector('.wheel-instruction');
 
 if(instruction)instruction.innerHTML='☝️ TOQUE NA ESTRELA PARA GIRAR A ROLETA ✦';
-const helper=document.createElement('p');helper.className='note';helper.textContent='Informe seu CPF, aceite a participação e toque diretamente na estrela para girar.';form.prepend(helper);
+const helper=document.createElement('p');helper.className='note';helper.textContent='Informe seu CPF e aceite a participação para continuar.';form.prepend(helper);
+const goButton=document.createElement('button');goButton.type='button';goButton.id='roletaGoUp';goButton.textContent='✦ VIRAR A ROLETA ✦';goButton.style.cssText='display:block;width:100%;margin:15px 0 8px;padding:17px 12px;border-radius:999px;border:2px solid #ffe5a1;background:linear-gradient(110deg,#9d631b,#ffe7a0,#fff9d6,#d99b2f,#fff0ad,#9f621b);background-size:260% 100%;color:#3a1707;font:900 14px system-ui,sans-serif;letter-spacing:.06em;box-shadow:0 0 15px #ffe7a388,0 0 32px #f9c65c88;cursor:pointer;animation:goldSweep 3s linear infinite';form.append(goButton);
 const recoverHint=document.createElement('p');recoverHint.className='note';recoverHint.textContent='Se já participou, informe o mesmo CPF e toque na estrela para recuperar seu prêmio.';form.append(recoverHint);
 form.style.maxWidth='340px';
 const updateReady=()=>{ready=cpfInput.value.replace(/\D/g,'').length===11&&consent.checked;if(ready){status.textContent='Pronto! Toque na estrela acima. ✨';wheelStar.setAttribute('aria-label','Toque na estrela para girar a roleta');}else{status.textContent='';}};
 cpfInput.addEventListener('input',updateReady);consent.addEventListener('change',updateReady);
+goButton.onclick=()=>{updateReady();if(!ready||!form.reportValidity()){status.textContent='Preencha o CPF e marque o aceite antes de continuar.';return;}cpfInput.blur();status.textContent='Agora toque na estrela para girar! ✨';const wheel=document.querySelector('.wheel-frame')||wheelStar;wheel.scrollIntoView({behavior:'smooth',block:'center'});wheelStar.classList.add('roleta-ready');};
+const hand=document.createElement('div');hand.textContent='👇';hand.setAttribute('aria-hidden','true');hand.style.cssText='position:absolute;left:50%;top:-64px;transform:translateX(-50%);font-size:42px;filter:drop-shadow(0 0 10px #ffe9ac);animation:roletaPoint 1s ease-in-out infinite;pointer-events:none;z-index:15';wheelStar.style.position='relative';wheelStar.appendChild(hand);
+const pointStyle=document.createElement('style');pointStyle.textContent='@keyframes roletaPoint{0%,100%{transform:translate(-50%,0)}50%{transform:translate(-50%,12px)}}';document.head.appendChild(pointStyle);
 function displayCoupon(result){
 const c=result?.coupon||result?.award?.coupon||null;
 if(!c||!c.code||!c.prize_id){status.textContent='O servidor não confirmou um cupom. Nenhum resultado será anunciado.';return false;}
