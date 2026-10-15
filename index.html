@@ -37,7 +37,7 @@ const updateReady=()=>{ready=cpfInput.value.replace(/\D/g,'').length===11&&conse
 cpfInput.addEventListener('input',updateReady);consent.addEventListener('change',updateReady);
 goButton.onclick=()=>{updateReady();if(!ready||!form.reportValidity()){status.textContent='Preencha o CPF e marque o aceite antes de continuar.';return;}cpfInput.blur();status.textContent='Agora toque na estrela para girar! ✨';const wheel=document.querySelector('.wheel-frame')||wheelStar;wheel.scrollIntoView({behavior:'smooth',block:'center'});wheelStar.classList.add('roleta-ready');};
 const hand=document.createElement('div');hand.textContent='👇';hand.setAttribute('aria-hidden','true');hand.style.cssText='position:absolute;left:50%;top:-64px;transform:translateX(-50%);font-size:42px;filter:drop-shadow(0 0 10px #ffe9ac);animation:roletaPoint 1s ease-in-out infinite;pointer-events:none;z-index:15';wheelStar.style.position='relative';wheelStar.appendChild(hand);
-const pointStyle=document.createElement('style');pointStyle.textContent='@keyframes roletaPoint{0%,100%{transform:translate(-50%,0)}50%{transform:translate(-50%,12px)}}';document.head.appendChild(pointStyle);
+const pointStyle=document.createElement('style');pointStyle.textContent='@keyframes roletaPoint{0%,100%{transform:translate(-50%,0)}50%{transform:translate(-50%,12px)}}@keyframes roletaWaiting{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}.wheel.roleta-waiting{animation:roletaWaiting 1.4s linear infinite!important;transition:none!important}';document.head.appendChild(pointStyle);
 function displayCoupon(result){
 const c=result?.coupon||result?.award?.coupon||null;
 if(!c||!c.code||!c.prize_id){status.textContent='O servidor não confirmou um cupom. Nenhum resultado será anunciado.';return false;}
@@ -68,7 +68,9 @@ async function requestPrize(action){
 if(busy)return;
 updateReady();if(!ready||!form.reportValidity()){status.textContent='Preencha o CPF e aceite a participação antes de tocar na estrela.';form.scrollIntoView({behavior:'smooth',block:'center'});return;}
 busy=true;
-status.textContent=action==='girar'?'Registrando seu prêmio com segurança...':'Consultando seu prêmio...';
+const wheel=document.querySelector('.wheel');
+if(action==='girar'){wheel.classList.add('roleta-waiting');status.textContent='A estrela está buscando seu prêmio... ✨';}
+else status.textContent='Consultando seu prêmio...';
 try{
 const res=await fetch(API,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({cpf:form.querySelector('#roletaCpf').value,aceite:true,versao_aceite:CONSENT,acao:action}),cache:'no-store'});
 const data=await res.json();
@@ -82,8 +84,10 @@ if(action==='girar'&&!data.duplicate){
 const prizes=['50','20','5','none','10','ensaio'];
 const index=prizes.indexOf(String(data.coupon?.prize_id));
 if(index<0){status.textContent='Resultado inesperado. Recupere seu prêmio pelo CPF.';return;}
-const wheel=document.querySelector('.wheel');
-const previous=Number(wheel.dataset.turns)||0;
+wheel.classList.remove('roleta-waiting');
+wheel.style.transition='none';wheel.style.transform='rotate(0deg)';void wheel.offsetWidth;
+wheel.style.transition='transform 6s cubic-bezier(.08,.7,.08,1)';
+const previous=0;
 const target=330-index*60;
 const next=previous+1800+((target-previous)%360+360)%360;
 wheel.dataset.turns=String(next);wheel.style.transform='rotate('+next+'deg)';
@@ -91,7 +95,7 @@ await new Promise(resolve=>setTimeout(resolve,6000));
 }
 displayCoupon(data);
 }catch(e){status.textContent='Conexão interrompida. Use “Recuperar meu prêmio” para consultar o resultado registrado.';}
-finally{busy=false;}
+finally{wheel?.classList.remove('roleta-waiting');busy=false;}
 }
 form.onsubmit=e=>{e.preventDefault();updateReady();if(ready){cpfInput.blur();status.textContent='Agora toque na estrela para descobrir seu prêmio. ✨';wheelStar.scrollIntoView({behavior:'smooth',block:'center'});}};
 wheelStar.onclick=()=>{if(!busy&&!awarded){document.activeElement?.blur?.();requestPrize('girar');}};
