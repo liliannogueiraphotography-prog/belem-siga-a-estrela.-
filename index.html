@@ -38,6 +38,24 @@ cpfInput.addEventListener('input',updateReady);consent.addEventListener('change'
 goButton.onclick=()=>{updateReady();if(!ready||!form.reportValidity()){status.textContent='Preencha o CPF e marque o aceite antes de continuar.';return;}cpfInput.blur();status.textContent='Agora toque na estrela para girar! ✨';const wheel=document.querySelector('.wheel-frame')||wheelStar;wheel.scrollIntoView({behavior:'smooth',block:'center'});wheelStar.classList.add('roleta-ready');};
 const hand=document.createElement('div');hand.textContent='👇';hand.setAttribute('aria-hidden','true');hand.style.cssText='position:absolute;left:50%;top:-64px;transform:translateX(-50%);font-size:42px;filter:drop-shadow(0 0 10px #ffe9ac);animation:roletaPoint 1s ease-in-out infinite;pointer-events:none;z-index:15';wheelStar.style.position='relative';wheelStar.appendChild(hand);
 const pointStyle=document.createElement('style');pointStyle.textContent='@keyframes roletaPoint{0%,100%{transform:translate(-50%,0)}50%{transform:translate(-50%,12px)}}@keyframes roletaWaiting{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}.wheel.roleta-waiting{animation:roletaWaiting 1.4s linear infinite!important;transition:none!important}';document.head.appendChild(pointStyle);
+// Efeitos sonoros da experiência (Web Audio; sem arquivos externos).
+const roletaSfx=(()=>{
+ let ctx,spinTimer=null,spinning=false;
+ const enabled=()=>{const m=document.getElementById('music');return !m?.muted && document.getElementById('soundToggle')?.getAttribute('aria-pressed')!=='false'};
+ function context(){if(!enabled())return null;try{ctx=ctx||new (window.AudioContext||window.webkitAudioContext)();if(ctx.state==='suspended')ctx.resume().catch(()=>{});return ctx}catch(e){return null}}
+ function tone(freq,duration=.07,vol=.055,type='triangle',delay=0){const c=context();if(!c)return;const t=c.currentTime+delay,o=c.createOscillator(),g=c.createGain();o.type=type;o.frequency.setValueAtTime(freq,t);g.gain.setValueAtTime(.001,t);g.gain.exponentialRampToValueAtTime(Math.max(.002,vol),t+.012);g.gain.exponentialRampToValueAtTime(.001,t+duration);o.connect(g);g.connect(c.destination);o.start(t);o.stop(t+duration+.02)}
+ function noise(duration=.11,vol=.05,delay=0,highpass=450){const c=context();if(!c)return;const t=c.currentTime+delay,b=c.createBuffer(1,Math.ceil(c.sampleRate*duration),c.sampleRate),d=b.getChannelData(0);for(let i=0;i<d.length;i++)d[i]=(Math.random()*2-1);const src=c.createBufferSource(),f=c.createBiquadFilter(),g=c.createGain();src.buffer=b;f.type='highpass';f.frequency.value=highpass;g.gain.setValueAtTime(.001,t);g.gain.linearRampToValueAtTime(vol,t+.012);g.gain.exponentialRampToValueAtTime(.001,t+duration);src.connect(f);f.connect(g);g.connect(c.destination);src.start(t);src.stop(t+duration)}
+ function startSpin(){stopSpin();context();spinning=true;let i=0;const pulse=()=>{if(!spinning)return;tone(370+(i%6)*38,.045,.043,'square');i++;spinTimer=setTimeout(pulse,Math.max(65,145-Math.min(i,35)*2))};pulse()}
+ function stopSpin(){spinning=false;if(spinTimer){clearTimeout(spinTimer);spinTimer=null}}
+ function parchment(){noise(.48,.095,0,220);noise(.38,.06,.19,320);tone(590,.26,.035,'sine',.24)}
+ function celebrate(){// Palmas em camadas, gritos festivos sintetizados e sinos.
+ for(let i=0;i<23;i++){const t=i*.105+Math.random()*.035;noise(.07,.07+Math.random()*.045,t,900);if(i%3===0)noise(.085,.05,t+.024,1200)}
+ [523,659,784,1047,1318].forEach((f,i)=>tone(f,.32,.065,'sine',i*.115));
+ // Coro festivo "êêê!" estilizado, sem voz gravada.
+ for(let j=0;j<3;j++){tone(390+j*28,.55,.027,'sawtooth',.18+j*.11);tone(590+j*33,.48,.02,'sine',.25+j*.11)}
+ }
+ return {startSpin,stopSpin,parchment,celebrate,unlock:context};
+})();
 function displayCoupon(result){
 const c=result?.coupon||result?.award?.coupon||null;
 if(!c||!c.code||!c.prize_id){status.textContent='O servidor não confirmou um cupom. Nenhum resultado será anunciado.';return false;}
@@ -59,6 +77,7 @@ let copy=parchment.querySelector('.roleta-copy');
 if(!copy){copy=document.createElement('button');copy.type='button';copy.className='roleta-copy';parchment.querySelector('.coupon-display').after(copy);}
 copy.textContent='Copiar cupom';copy.onclick=()=>navigator.clipboard.writeText(c.code).then(()=>{copy.textContent='Código copiado!'}).catch(()=>{copy.textContent='Selecione e copie o código acima'});
 parchment.classList.remove('hidden');
+roletaSfx.parchment();setTimeout(()=>roletaSfx.celebrate(),450);
 wheelStar.setAttribute('aria-disabled','true');
 wheelStar.setAttribute('aria-label','Prêmio já registrado');
 wheelStar.style.cursor='default';
@@ -72,7 +91,7 @@ if(busy)return;
 updateReady();if(!ready||!form.reportValidity()){status.textContent='Preencha o CPF e aceite a participação antes de tocar na estrela.';form.scrollIntoView({behavior:'smooth',block:'center'});return;}
 busy=true;
 const wheel=document.querySelector('.wheel');
-if(action==='girar'){wheel.classList.add('roleta-waiting');status.textContent='A estrela está buscando seu prêmio... ✨';}
+if(action==='girar'){roletaSfx.startSpin();wheel.classList.add('roleta-waiting');status.textContent='A estrela está buscando seu prêmio... ✨';}
 else status.textContent='Consultando seu prêmio...';
 try{
 const res=await fetch(API,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({cpf:form.querySelector('#roletaCpf').value,aceite:true,versao_aceite:CONSENT,acao:action}),cache:'no-store'});
@@ -96,9 +115,9 @@ const next=previous+1800+((target-previous)%360+360)%360;
 wheel.dataset.turns=String(next);wheel.style.transform='rotate('+next+'deg)';
 await new Promise(resolve=>setTimeout(resolve,6000));
 }
-displayCoupon(data);
+roletaSfx.stopSpin();displayCoupon(data);
 }catch(e){status.textContent='Conexão interrompida. Use “Recuperar meu prêmio” para consultar o resultado registrado.';}
-finally{wheel?.classList.remove('roleta-waiting');busy=false;}
+finally{roletaSfx.stopSpin();wheel?.classList.remove('roleta-waiting');busy=false;}
 }
 const TEST_MODE=new URLSearchParams(location.search).get('teste')==='1';
 if(TEST_MODE){
@@ -119,7 +138,7 @@ if(TEST_MODE){
     const prizes=['50','20','5','5','10','ensaio'];
     const chosen='5';
     const wheel=document.querySelector('.wheel');
-    wheel.classList.add('roleta-waiting');
+    roletaSfx.startSpin();wheel.classList.add('roleta-waiting');
     wheel.scrollIntoView({behavior:'smooth',block:'center'});
     await new Promise(resolve=>setTimeout(resolve,1200));
     wheel.classList.remove('roleta-waiting');
@@ -129,7 +148,7 @@ if(TEST_MODE){
     wheel.style.transform='rotate('+(1800+(330-index*60))+'deg)';
     await new Promise(resolve=>setTimeout(resolve,6000));
     const demoCode='TESTE-'+chosen.toUpperCase()+'-'+Math.random().toString(36).slice(2,8).toUpperCase();
-    displayCoupon({ok:true,coupon:{code:demoCode,prize_id:chosen,label:'Prêmio de demonstração',expires_at:null}});
+    roletaSfx.stopSpin();displayCoupon({ok:true,coupon:{code:demoCode,prize_id:chosen,label:'Prêmio de demonstração',expires_at:null}});
     const demo=parchment.querySelector('.scroll-demo');
     demo.textContent='⚠️ TESTE: cupom fictício. Não gera desconto nem reserva.';
     demo.style.cssText='display:block!important;color:#8b2118;font-weight:900;font-size:15px';
