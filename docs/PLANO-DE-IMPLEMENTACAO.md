@@ -1,5 +1,7 @@
 # Plano de implementação | Belém Siga a Estrela
 
+> Plano original, mantido como histórico. Quantidades e etapas abaixo podem estar desatualizadas. Consulte o [relatório da auditoria](RELATORIO-ROLETA.md) e o README para a implementação vigente.
+
 ## Identidade
 Sem árvore de Natal, Papai Noel ou elementos natalinos convencionais. Estrela central, atmosfera de Belém, palha, linho, tons terrosos, dourado e luz quente.
 A frase "Entre na história que mudou todas as histórias" aparece apenas na entrada do site, acompanhada da estrela.
