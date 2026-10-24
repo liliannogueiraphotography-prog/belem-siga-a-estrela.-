@@ -26,16 +26,27 @@ declare
   v_roll float8;
   v_claimed int;
   v_total int;
-  v_threshold bigint;
 begin
   if p_session is null then raise exception 'Sessão obrigatória'; end if;
-  select * into v_existing from public.campaign_awards where session_id=p_session;
+  -- Serializar antes da consulta idempotente: a segunda chamada deve enxergar
+  -- o cupom confirmado pela primeira, em vez de tentar outro INSERT.
+  select enabled,spins_total into v_enabled,v_spin from public.campaign_control where id=true for update;
+  if not found then raise exception 'Campanha ainda não ativada'; end if;
+  -- Bloquear também o prêmio existente para não recuperar um cupom enquanto
+  -- uma transação de resgate altera seu estado.
+  select * into v_existing from public.campaign_awards where session_id=p_session for update;
   if found then
+    if v_existing.status='redeemed' or v_existing.redeemed_at is not null then
+      raise exception 'Cupom já utilizado';
+    end if;
+    if v_existing.status='expired' or v_existing.expires_at<=clock_timestamp() then
+      raise exception 'Cupom expirado';
+    end if;
     return query select v_existing.prize_id,v_existing.coupon_code,v_existing.expires_at;
     return;
   end if;
-  select enabled,spins_total into v_enabled,v_spin from public.campaign_control where id=true for update;
-  if not found or not v_enabled then raise exception 'Campanha ainda não ativada'; end if;
+  -- Pausar novos giros não impede recuperar um prêmio válido já emitido.
+  if not v_enabled then raise exception 'Campanha ainda não ativada'; end if;
   v_spin:=v_spin+1;
   -- Distribuição progressiva conservadora; limites continuam sendo rígidos.
   -- Nunca libera o prêmio principal antes de 50 giros, nem 50% antes de 20.
