@@ -85,6 +85,7 @@ def main():
         native_run(['docker','exec','-i',container,'psql','-X','-p','55432','-U','fixture_admin','-d','postgres',
             '-v','ON_ERROR_STOP=1'],input='CREATE TABLE public.isolated_test_marker(value boolean NOT NULL); INSERT INTO public.isolated_test_marker VALUES(true);',text=True,check=True,capture_output=True)
         execute([args.bun,'scripts/roleta-isolated-tests.mjs'],args.master,'master-sql')
+        execute([args.bun,'scripts/roleta-quota-isolated-tests.mjs'],args.master,'master-quotas')
         config=args.output/'vitest.master.config.mts'
         config.write_text('export default '+json.dumps({'resolve':{'alias':{'@':str(args.master/'src')}},'test':{
             'include':['src/lib/roleta.test.ts','src/lib/roleta-endpoint.integration.test.ts','src/lib/roleta-recovery.integration.test.ts'],'testTimeout':20000,'fileParallelism':False}})+';\n')

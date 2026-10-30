@@ -22,7 +22,7 @@ git clone https://github.com/liliannogueiraphotography-prog/bel-m-experience-sit
 
 Não repita o clone se já houver um checkout. Versões verificadas:
 
-- Master: `b89a117ce74b0b80cacfeca14f0aed238ae6b516`.
+- Master: `29c01a9ef259627285fe916b698574b6979e0e33`.
 - Experience: `4abda9e1cc29ad9e3723f23c2a0517edcc923dc6`.
 - Bun 1.4.4; PostgreSQL 17 com manifesto fixado no runner.
 
@@ -56,3 +56,7 @@ O bootstrap deriva tabelas dos tipos e instala os corpos reais das funções, co
 O Master candidato precisa incluir `0017_roleta_recovery_proof.sql` e o bootstrap atualizado. O handler público recebe também `comprovante`, persistido em IndexedDB no navegador, e usa a RPC privilegiada de autorização. Não adaptar a ponte para ignorar essa prova. A limpeza das fixtures inclui a tabela de pedidos para não misturar os limites entre jornadas. Os SHA efetivamente testados ficam em `result.json`.
 
 `BELEM_BROWSER=webkit` permite executar a suíte com WebKit instalado pelo Playwright; `BROWSER_EXECUTABLE` é um caminho opcional para um executável local confiável. Não substitua um erro de mídia por sucesso simulado. Nesta máquina, a execução WebKit teve 27 testes de página aprovados e um erro no vídeo; a suíte integrada completa aprovada é a Chromium. A validação física de Safari permanece pendente.
+
+## Esgotamento das cotas
+
+O Master deve incluir também `scripts/roleta-quota-isolated-tests.mjs`. O runner o executa após a suíte SQL existente: cinco grupos extras disputam as cotas 1/3/10/50, exercitam recusa dos excedentes, repetição idempotente, expiração, manutenção dos resgatados na cota e fallback ao compartilhável de 5%. São fixtures marcadas e descartáveis; não executar contra outro banco. Detalhes da verificação em `docs/TESTE-CUPONS-LIMITES-VIDEO.md`.
