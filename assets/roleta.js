@@ -6,6 +6,45 @@ const TEST_MODE=new URLSearchParams(location.search).get('teste')==='1';
 const RESERVATIONS_URL='https://natal.estudioliliancristina.com.br/';
 const PRIZES=['50','20','5','5','10','ensaio'];
 const REQUEST_TIMEOUT_MS=15000;
+// An IndexedDB read/write transaction serializes first use across tabs. Store
+// only an opaque capability: never CPF, coupon, URL parameters or analytics.
+function browserProof(){
+  return new Promise((resolve,reject)=>{
+    let database,settled=false;
+    const finish=(error,value)=>{
+      if(settled)return;
+      settled=true;clearTimeout(timer);database?.close();
+      if(error)reject(error);else resolve(value);
+    };
+    const timer=setTimeout(()=>finish(new Error('STORAGE_UNAVAILABLE')),2500);
+    try{
+      const open=indexedDB.open('belem-campaign-security',1);
+      open.onupgradeneeded=()=>open.result.createObjectStore('proofs');
+      open.onerror=()=>finish(new Error('STORAGE_UNAVAILABLE'));
+      open.onblocked=()=>finish(new Error('STORAGE_UNAVAILABLE'));
+      open.onsuccess=()=>{
+        database=open.result;
+        if(settled){database.close();return;}
+        try{
+        const transaction=database.transaction('proofs','readwrite');
+        const store=transaction.objectStore('proofs');
+        const read=store.get('v1');let value;
+        transaction.onabort=transaction.onerror=()=>finish(new Error('STORAGE_UNAVAILABLE'));
+        transaction.oncomplete=()=>finish(null,value);
+        read.onsuccess=()=>{
+          try{
+          if(read.result===undefined){
+            value=Array.from(crypto.getRandomValues(new Uint8Array(32)),x=>x.toString(16).padStart(2,'0')).join('');
+            store.put(value,'v1');
+          }else if(typeof read.result==='string'&&/^[0-9a-f]{64}$/.test(read.result))value=read.result;
+          else transaction.abort();
+          }catch{transaction.abort();finish(new Error('STORAGE_UNAVAILABLE'));}
+        };
+        }catch{finish(new Error('STORAGE_UNAVAILABLE'));}
+      };
+    }catch{finish(new Error('STORAGE_UNAVAILABLE'));}
+  });
+}
 const spinSection=document.getElementById('spin');
 const wheelStar=document.getElementById('wheelStar');
 const parchment=document.getElementById('parchmentReveal');
@@ -54,7 +93,7 @@ const recover=document.createElement('button');
 recover.type='button';recover.id='roletaRecover';recover.textContent='Recuperar meu prêmio';
 recover.style.cssText='margin-top:9px;background:transparent;color:#f7dfb3;border:1px solid #c89b63';
 form.append(recover);
-const recoverHint=document.createElement('p');recoverHint.className='note';recoverHint.textContent='Se já participou, informe o mesmo CPF e use Recuperar meu prêmio.';form.append(recoverHint);
+const recoverHint=document.createElement('p');recoverHint.className='note';recoverHint.textContent='Para recuperar, use o mesmo CPF e navegador. Em outro aparelho ou sem acesso ao comprovante, procure o atendimento.';form.append(recoverHint);
 form.style.maxWidth='340px';
 const cpfDigits=value=>value.replace(/\D/g,'');
 const cpfValido=value=>{const d=cpfDigits(value);if(d.length!==11||/^(\d)\1{10}$/.test(d))return false;const digito=tamanho=>{let soma=0;for(let i=0;i<tamanho;i++)soma+=Number(d[i])*(tamanho+1-i);const resto=(soma*10)%11;return resto===10?0:resto;};return digito(9)===Number(d[9])&&digito(10)===Number(d[10]);};
@@ -208,15 +247,18 @@ async function requestPrize(action){
   const wheel=document.querySelector('.wheel');
   const controller=new AbortController();
   const timeout=setTimeout(()=>controller.abort(),REQUEST_TIMEOUT_MS);
+  let requested=false;
+  try{
+    const comprovante=await browserProof();
   if(action==='girar'){
     pendingParticipants.add(cpf);
     roletaSfx.startSpin();wheel.classList.add('roleta-waiting');
     status.textContent='A estrela está buscando seu prêmio... ✨';
   }else status.textContent='Consultando seu prêmio...';
-  try{
+    requested=true;
     const res=await fetch(API,{
       method:'POST',headers:{'content-type':'application/json'},
-      body:JSON.stringify({cpf,aceite:true,versao_aceite:CONSENT,acao:action}),
+      body:JSON.stringify({cpf,aceite:true,versao_aceite:CONSENT,acao:action,comprovante}),
       cache:'no-store',credentials:'omit',referrerPolicy:'no-referrer',signal:controller.signal
     });
     const data=await res.json();
@@ -230,12 +272,13 @@ async function requestPrize(action){
         SOLD_OUT:'Os prêmios desta campanha se esgotaram.',
         FORBIDDEN_ORIGIN:'Abra a roleta pelo endereço oficial.',
         COUPON_EXPIRED:'Este cupom expirou.',
-        COUPON_REDEEMED:'Este cupom já foi utilizado.'
+        COUPON_REDEEMED:'Este cupom já foi utilizado.',
+        RECOVERY_REQUIRED:'Para recuperar com segurança, use o navegador da participação ou procure o atendimento. Nenhum novo prêmio foi emitido.'
       };
       // An explicit refusal before issuance can be retried by the user. Unknown
       // failures remain pending because the server may already have committed.
       if(data?.ok===false&&['DISTRIBUTION_DISABLED','NOT_CONFIGURED','CPF_INVALID',
-        'RATE_LIMITED','SOLD_OUT','FORBIDDEN_ORIGIN'].includes(data.code))pendingParticipants.delete(cpf);
+        'RATE_LIMITED','SOLD_OUT','FORBIDDEN_ORIGIN','RECOVERY_REQUIRED'].includes(data.code))pendingParticipants.delete(cpf);
       status.textContent=msgs[data?.code]||'Não foi possível confirmar o prêmio. Use Recuperar meu prêmio.';
       return;
     }
@@ -259,7 +302,7 @@ async function requestPrize(action){
     }
     if(displayCoupon(coupon))pendingParticipants.delete(cpf);
   }catch{
-    status.textContent='Conexão interrompida ou resposta inválida. Use Recuperar meu prêmio para consultar o resultado registrado.';
+    status.textContent=requested?'Conexão interrompida ou resposta inválida. Use Recuperar meu prêmio para consultar o resultado registrado.':'Não foi possível guardar seu comprovante de segurança. Permita o armazenamento neste navegador e tente novamente. Nenhum pedido foi enviado.';
   }finally{
     clearTimeout(timeout);roletaSfx.stopSpin();wheel.classList.remove('roleta-waiting');
     busy=false;updateControls();

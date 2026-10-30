@@ -4,6 +4,7 @@ Requires the isolated loopback services described in README.md. No production I/
 import functools
 from http.server import SimpleHTTPRequestHandler,ThreadingHTTPServer
 import json
+import os
 from pathlib import Path
 import threading
 import unittest
@@ -39,14 +40,19 @@ class FullStackBrowserTests(unittest.TestCase):
         cls.thread=threading.Thread(target=cls.server.serve_forever,daemon=True);cls.thread.start()
         cls.base=f'http://127.0.0.1:{cls.server.server_port}'
         cls.p=sync_playwright().start()
-        cls.browser=cls.p.chromium.launch(executable_path='/usr/bin/chromium',args=['--no-sandbox'])
+        cls.engine=os.environ.get('BELEM_BROWSER','chromium')
+        if cls.engine=='webkit':
+            options={'executable_path':os.environ['BROWSER_EXECUTABLE']} if os.environ.get('BROWSER_EXECUTABLE') else {}
+            cls.browser=cls.p.webkit.launch(**options)
+        elif cls.engine=='chromium':cls.browser=cls.p.chromium.launch(executable_path='/usr/bin/chromium',args=['--no-sandbox'])
+        else:raise ValueError('BELEM_BROWSER must be chromium or webkit')
 
     @classmethod
     def tearDownClass(cls):
         cls.browser.close();cls.p.stop();cls.server.shutdown();cls.server.server_close();cls.thread.join()
 
     def setUp(self):
-        self.context=self.browser.new_context(viewport={'width':390,'height':844},reduced_motion='reduce')
+        self.context=self.browser.new_context(viewport={'width':390,'height':844},reduced_motion='reduce',is_mobile=self.engine=='webkit',has_touch=self.engine=='webkit')
         self.errors=[];self.blocked=[];self.raffle_responses=[];self.target=None
         self.context.route('**/*',self.intercept)
         self.context.on('page',lambda p:p.on('pageerror',lambda e:self.errors.append(str(e))))
@@ -69,6 +75,8 @@ class FullStackBrowserTests(unittest.TestCase):
         elif url==CHECKOUT and self.target:
             route.fulfill(status=302,headers={'location':self.target})
         elif urlsplit(url).netloc in (urlsplit(self.base).netloc,'127.0.0.1:8081'):
+            route.continue_()
+        elif any(url.startswith('blob:'+origin+'/') for origin in (self.base,SITE)):
             route.continue_()
         elif 'fonts.googleapis.com' in url or 'fonts.gstatic.com' in url:
             route.fulfill(status=200,content_type='text/css',body='')

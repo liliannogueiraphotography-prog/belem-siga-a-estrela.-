@@ -39,7 +39,7 @@ Bun.serve({hostname:'127.0.0.1',port:55433,async fetch(request:Request){
   if(url.pathname==='/fixture/reset'&&request.method==='POST'){
    const {prize}=await request.json();
    if(!['5','10','20','50','ensaio'].includes(prize))return new Response(null,{status:400});
-   await db`truncate belem_roleta_shared_uses,belem_roleta_shared_awards,belem_roleta_coupons,belem_roleta_draw_attempts,belem_roleta_participants,belem_payment_attempts,belem_payments,belem_credit_applications,belem_coupon_redemptions,belem_reservations,belem_slots,belem_customers cascade`;
+   await db`truncate belem_roleta_public_requests,belem_roleta_shared_uses,belem_roleta_shared_awards,belem_roleta_coupons,belem_roleta_draw_attempts,belem_roleta_participants,belem_payment_attempts,belem_payments,belem_credit_applications,belem_coupon_redemptions,belem_reservations,belem_slots,belem_customers cascade`;
    // Deterministic prizes only in this marked, disposable database.
    await db`update belem_roleta_prizes set active=true,weight=case when prize_id=${prize} then 1 else 0 end`;
    await db`update belem_roleta_config set distribution_enabled=true`;

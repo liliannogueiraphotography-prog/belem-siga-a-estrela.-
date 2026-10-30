@@ -33,3 +33,5 @@ As correções não foram publicadas. A emissão, validação e aplicação fora
 A integração existente foi localizada nos projetos privados `bel-m-masterpiece` e `bel-m-experience-site` e testada localmente com os cinco prêmios. O prêmio de 5% usa código compartilhável, padrão `ESTRELA5`, sem vencimento, conforme o contrato do Master. Os scripts `campaign_*` deste repositório são históricos e não devem ser aplicados ao banco compartilhado de reservas.
 
 Execução reproduzível entre os três projetos: [testes de integração](tests/integration/README.md). A homologação da configuração publicada e a autorização de produção continuam pendentes.
+
+Atualização da segurança da recuperação, testes e ordem de ativação: [prontidão da candidata](docs/PRONTIDAO-SEGURANCA.md). A migração 0017 pertence ao Master e depende de revisão/autorização; o fluxo exige publicação coordenada dos dois PRs.

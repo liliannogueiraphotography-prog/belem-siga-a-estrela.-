@@ -22,7 +22,7 @@ git clone https://github.com/liliannogueiraphotography-prog/bel-m-experience-sit
 
 Não repita o clone se já houver um checkout. Versões verificadas:
 
-- Master: `587b9c770e6984c4ee1a3ddaf70c7765c73adf14`.
+- Master: `b89a117ce74b0b80cacfeca14f0aed238ae6b516`.
 - Experience: `4abda9e1cc29ad9e3723f23c2a0517edcc923dc6`.
 - Bun 1.4.4; PostgreSQL 17 com manifesto fixado no runner.
 
@@ -45,8 +45,14 @@ Os logs e `result.json` ficam no diretório de saída. Uma falha interrompe a ex
 
 ## Cobertura e limites
 
-O runner executa os 11 grupos SQL existentes do Master, os 19 testes de roleta/endpoint do Master, os 189 testes do Experience e cinco jornadas no Chromium. As jornadas sorteiam cada prêmio, recuperam o mesmo código, abrem o link do resgate por redirecionamento **apenas no teste** para o checkout local, rejeitam um código inválido, aplicam o válido e conferem o banco. Descontos percentuais preservam adicionais e saldo após refresh. Ensaio do Pacote 1 confirma uma reserva fictícia de total zero, com um único registro contábil de R$0 e nenhuma tentativa de pagamento.
+O runner executa os 11 grupos SQL existentes do Master, os 27 testes de roleta/endpoint/segurança do Master, os 189 testes do Experience e cinco jornadas no Chromium. As jornadas sorteiam cada prêmio, recuperam o mesmo código, abrem o link do resgate por redirecionamento **apenas no teste** para o checkout local, rejeitam um código inválido, aplicam o válido e conferem o banco. Descontos percentuais preservam adicionais e saldo após refresh. Ensaio do Pacote 1 confirma uma reserva fictícia de total zero, com um único registro contábil de R$0 e nenhuma tentativa de pagamento.
 
 Os dados de cliente/reserva/termos são fixtures SQL locais; o formulário completo de inscrição e a seleção da agenda não são percorridos nesse teste. Os testes de componente do Experience exercitam handlers/validadores e o checkout real; testes de pagamento simulam o provedor. Autenticação Supabase, RLS, grants e paridade da migração implantada em produção não são certificados por essa cópia isolada. Safari físico e pagamentos/webhooks sandbox exigem homologação separada.
 
 O bootstrap deriva tabelas dos tipos e instala os corpos reais das funções, com as constraints e o trigger necessários às verificações. Não é uma cópia integral do esquema gerenciado. Alterar pesos para determinar os cinco prêmios acontece apenas nas fixtures locais, nunca na campanha real.
+
+## Recuperação protegida
+
+O Master candidato precisa incluir `0017_roleta_recovery_proof.sql` e o bootstrap atualizado. O handler público recebe também `comprovante`, persistido em IndexedDB no navegador, e usa a RPC privilegiada de autorização. Não adaptar a ponte para ignorar essa prova. A limpeza das fixtures inclui a tabela de pedidos para não misturar os limites entre jornadas. Os SHA efetivamente testados ficam em `result.json`.
+
+`BELEM_BROWSER=webkit` permite executar a suíte com WebKit instalado pelo Playwright; `BROWSER_EXECUTABLE` é um caminho opcional para um executável local confiável. Não substitua um erro de mídia por sucesso simulado. Nesta máquina, a execução WebKit teve 27 testes de página aprovados e um erro no vídeo; a suíte integrada completa aprovada é a Chromium. A validação física de Safari permanece pendente.

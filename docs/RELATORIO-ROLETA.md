@@ -1,5 +1,7 @@
 # Roleta Siga a Estrela — relatório de conclusão local e homologação
 
+> Registro da auditoria inicial. A proteção posterior da recuperação e os resultados atuais estão em [Prontidão e segurança](PRONTIDAO-SEGURANCA.md). A implementação candidata continua sem publicação.
+
 Data: 24/10/2026. Projeto original preservado. Nenhuma publicação, migração SQL remota, cobrança, cupom ou reserva real foi criada durante os testes.
 
 ## Resultado

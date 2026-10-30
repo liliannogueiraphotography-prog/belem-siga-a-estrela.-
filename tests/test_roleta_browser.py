@@ -40,9 +40,15 @@ class RouletteBrowserTests(unittest.TestCase):
         cls.thread.start()
         cls.base = f'http://127.0.0.1:{cls.server.server_port}'
         cls.playwright = sync_playwright().start()
-        browser_path = os.environ.get('CHROMIUM_EXECUTABLE', '/usr/bin/chromium')
-        cls.browser = cls.playwright.chromium.launch(executable_path=browser_path,
-                                                     args=['--no-sandbox'])
+        cls.engine = os.environ.get('BELEM_BROWSER', 'chromium')
+        if cls.engine == 'webkit':
+            options = {'executable_path': os.environ['BROWSER_EXECUTABLE']} if os.environ.get('BROWSER_EXECUTABLE') else {}
+            cls.browser = cls.playwright.webkit.launch(**options)
+        elif cls.engine == 'chromium':
+            browser_path = os.environ.get('CHROMIUM_EXECUTABLE', '/usr/bin/chromium')
+            cls.browser = cls.playwright.chromium.launch(executable_path=browser_path,args=['--no-sandbox'])
+        else:
+            raise ValueError('BELEM_BROWSER must be chromium or webkit')
 
     @classmethod
     def tearDownClass(cls):
@@ -54,7 +60,7 @@ class RouletteBrowserTests(unittest.TestCase):
 
     def setUp(self):
         self.context = self.browser.new_context(viewport={'width':390,'height':844},
-            reduced_motion='reduce', service_workers='block')
+            reduced_motion='reduce', service_workers='block',is_mobile=self.engine=='webkit',has_touch=self.engine=='webkit')
         self.page = self.context.new_page()
         self.page.set_default_timeout(5000)
         self.errors = []
@@ -94,6 +100,9 @@ class RouletteBrowserTests(unittest.TestCase):
                 route.abort()
             else:
                 route.continue_()
+        elif url.startswith('blob:'+self.base+'/'):
+            # WebKit exposes origin-local blob workers to routing; no network I/O.
+            route.continue_()
         else:
             self.external.append(url)
             route.abort()
@@ -143,7 +152,8 @@ class RouletteBrowserTests(unittest.TestCase):
                 self.spin()
                 expect(self.page.locator('#parchmentReveal')).to_be_visible()
                 expect(self.page.locator('.scroll-prize')).to_contain_text(label)
-                self.assertEqual(self.calls[-1], dict(cpf=CPF,aceite=True,versao_aceite='roleta-2026-10',acao='girar'))
+                self.assertRegex(self.calls[-1]['comprovante'],r'^[0-9a-f]{64}$')
+                self.assertEqual({k:v for k,v in self.calls[-1].items() if k!='comprovante'}, dict(cpf=CPF,aceite=True,versao_aceite='roleta-2026-10',acao='girar'))
                 expect(self.page.locator('#source')).to_have_text('pizzaria')
                 expect(self.page.locator('#redeemPrize')).to_have_attribute('href',RESERVATIONS)
                 expect(self.page.locator('#wheelStar')).to_have_attribute('aria-disabled','true')
@@ -214,6 +224,52 @@ class RouletteBrowserTests(unittest.TestCase):
         self.page.locator('#roletaConsent').uncheck()
         expect(self.page.locator('#roletaRecover')).to_be_disabled()
 
+    def test_receipt_survives_reload_without_storing_cpf(self):
+        self.open();self.fill();self.answer(coupon(),duplicate=True);self.spin()
+        expect(self.page.locator('#parchmentReveal')).to_be_visible()
+        first=self.calls[-1]['comprovante']
+        self.open();self.fill();self.answer(coupon(),duplicate=True)
+        self.page.locator('#roletaRecover').click()
+        expect(self.page.locator('#parchmentReveal')).to_be_visible()
+        self.assertEqual(self.calls[-1]['comprovante'],first)
+        self.assertNotEqual(first,CPF)
+        self.assertNotIn(CPF,self.page.evaluate('JSON.stringify(localStorage)'))
+
+    def test_storage_failure_sends_no_request_or_coupon(self):
+        self.open();self.fill()
+        self.page.evaluate("()=>{indexedDB.open=()=>{throw new Error('Storage disabled')}}")
+        self.spin()
+        expect(self.page.locator('#roletaStatus')).to_contain_text('Nenhum pedido foi enviado')
+        self.wait_done();self.assert_no_coupon()
+        self.assertEqual(self.calls,[])
+
+    def test_unknown_outcome_can_retry_only_after_explicit_server_refusal(self):
+        self.open();self.fill()
+        self.handler=lambda route:route.abort('failed');self.spin()
+        expect(self.page.locator('#roletaStatus')).to_contain_text('Conexão interrompida')
+        self.wait_done();self.handler=None
+        self.responses.append({'status':403,'json':dict(ok=False,code='RECOVERY_REQUIRED')})
+        self.spin()
+        expect(self.page.locator('#roletaStatus')).to_contain_text('Nenhum novo prêmio')
+        self.wait_done();self.answer(coupon(),duplicate=True);self.spin()
+        expect(self.page.locator('#parchmentReveal')).to_be_visible()
+        self.assertEqual([c['acao'] for c in self.calls],['girar','consultar','girar'])
+
+    def test_two_tabs_share_one_transactional_receipt(self):
+        self.open();self.fill();self.answer(coupon(),duplicate=True);self.spin()
+        expect(self.page.locator('#parchmentReveal')).to_be_visible()
+        first=self.calls[-1]['comprovante']
+        second=self.context.new_page()
+        second.route('**/*',self.route)
+        second.goto(self.base,wait_until='domcontentloaded')
+        expect(second.locator('#roletaCpf')).to_be_attached()
+        second.evaluate("document.getElementById('entry').classList.add('hidden');document.getElementById('spin').classList.remove('hidden')")
+        second.locator('#roletaCpf').fill(CPF);second.locator('#roletaConsent').check()
+        self.answer(coupon(),duplicate=True);second.locator('#wheelStar').dispatch_event('click')
+        expect(second.locator('#parchmentReveal')).to_be_visible()
+        self.assertEqual(self.calls[-1]['comprovante'],first)
+        second.close()
+
     def test_withdrawing_consent_hides_coupon(self):
         self.open();self.fill();self.answer(coupon(),duplicate=True);self.spin()
         expect(self.page.locator('#parchmentReveal')).to_be_visible()
@@ -225,6 +281,7 @@ class RouletteBrowserTests(unittest.TestCase):
         held=[]
         self.handler=lambda route:held.append(route)
         self.spin()
+        expect(self.page.locator('.wheel')).to_have_class('wheel roleta-waiting')
         expect(self.page.locator('#roletaCpf')).to_be_disabled()
         expect(self.page.locator('#roletaConsent')).to_be_disabled()
         expect(self.page.locator('#roletaRecover')).to_be_disabled()
@@ -250,6 +307,7 @@ class RouletteBrowserTests(unittest.TestCase):
         held=[]
         self.handler=lambda route:held.append(route)
         self.spin()
+        expect(self.page.locator('.wheel')).to_have_class('wheel roleta-waiting')
         expect(self.page.locator('#roletaCpf')).to_be_disabled()
         self.page.clock.fast_forward(15001)
         expect(self.page.locator('#roletaStatus')).to_contain_text('Conexão interrompida')

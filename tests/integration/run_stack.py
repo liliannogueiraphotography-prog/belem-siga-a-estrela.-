@@ -87,7 +87,7 @@ def main():
         execute([args.bun,'scripts/roleta-isolated-tests.mjs'],args.master,'master-sql')
         config=args.output/'vitest.master.config.mts'
         config.write_text('export default '+json.dumps({'resolve':{'alias':{'@':str(args.master/'src')}},'test':{
-            'include':['src/lib/roleta.test.ts','src/lib/roleta-endpoint.integration.test.ts'],'testTimeout':20000}})+';\n')
+            'include':['src/lib/roleta.test.ts','src/lib/roleta-endpoint.integration.test.ts','src/lib/roleta-recovery.integration.test.ts'],'testTimeout':20000,'fileParallelism':False}})+';\n')
         execute([args.bun,'x','vitest','run','--config',str(config)],args.master,'master-endpoint',{'ISOLATED_ROLETA_TEST':'1'})
         execute([args.bun,'x','vitest','run','--config','vitest.checkout.config.ts'],args.site,'checkout-regressions')
         transport=start([args.bun,str(ROOT/'tests/integration/serve-isolated.ts'),str(args.master)],args.master,'transport')
